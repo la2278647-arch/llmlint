@@ -181,3 +181,81 @@ test('fixDocument 返回对象形状稳定', () => {
   for (const x of r.fixes) assert.deepEqual(Object.keys(x).sort(), ['count', 'rule']);
   for (const x of r.fixes) assert.ok(x.count > 0);
 });
+test('CLI --dry-run 不改写磁盘，只报告将修什么', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'llmlint-fix-'));
+  const f = join(dir, 'x.md');
+  const before = '中文AI   ' + NL + '正文';
+  writeFileSync(f, before);
+  const r = spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', '--dry-run', f], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /将修复（未写入）/);
+  assert.match(r.stdout, /cjk-spacing/);
+  assert.match(r.stdout, /no-final-newline/);
+  assert.equal(readFileSync(f, 'utf8'), before, '磁盘内容必须保持原样');
+  unlinkSync(f);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI --dry-run 对 - 不向标准输出写修复后的正文', () => {
+  const r = spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', '--dry-run', '-'], { input: '中文AI   ' + NL, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /将修复（未写入）/);
+  assert.ok(r.stdout.indexOf('中文 AI') === -1, 'dry-run 不应输出修复后的正文');
+});
+
+test('CLI --dry-run 与 --format json 组合：fixes 字段仍在', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'llmlint-fix-'));
+  const f = join(dir, 'x.md');
+  const before = '中文AI   ' + NL;
+  writeFileSync(f, before);
+  const r = spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', '--dry-run', '--format', 'json', f], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const rep = JSON.parse(r.stdout);
+  assert.equal(rep.score.score, 100);
+  assert.equal(rep.fixes.length, 2);
+  assert.equal(readFileSync(f, 'utf8'), before);
+  unlinkSync(f);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI --dry-run 单独使用不做任何修复', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'llmlint-fix-'));
+  const f = join(dir, 'x.md');
+  const before = '中文AI   ' + NL;
+  writeFileSync(f, before);
+  const r = spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--dry-run', f], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stdout.indexOf('将修复') === -1);
+  assert.equal(readFileSync(f, 'utf8'), before);
+  unlinkSync(f);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI --fix 幂等：连跑两次，第二次内容不再变化', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'llmlint-fix-'));
+  const f = join(dir, 'x.md');
+  writeFileSync(f, '中文AI   ' + NL + '再来 中文AI。');
+  spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', f], { encoding: 'utf8' });
+  const after1 = readFileSync(f, 'utf8');
+  const r2 = spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', f], { encoding: 'utf8' });
+  assert.equal(readFileSync(f, 'utf8'), after1, '第二次运行不应改动文件');
+  assert.ok(r2.stdout.indexOf('已修复') === -1, '第二次不应报告任何修复');
+  unlinkSync(f);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI --fix 处理后 demo-bad.md 的三条可修复规则不再触发', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'llmlint-fix-'));
+  const f = join(dir, 'x.md');
+  writeFileSync(f, readFileSync('examples/demo-bad.md', 'utf8'));
+  const before = JSON.parse(spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--format', 'json', f], { encoding: 'utf8' }).stdout);
+  spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--fix', f], { encoding: 'utf8' });
+  const after = JSON.parse(spawnSync(process.execPath, [join('src', 'cli.js'), 'check', '--format', 'json', f], { encoding: 'utf8' }).stdout);
+  for (const rule of FIXABLE) {
+    assert.equal(after.findings.filter(function (x) { return x.rule === rule; }).length, 0, rule);
+  }
+  assert.ok(after.score.score > before.score.score, '修复后评分应上升');
+  unlinkSync(f);
+  rmSync(dir, { recursive: true, force: true });
+});
+

@@ -153,6 +153,9 @@ Three rules are pure mechanical rewrites. `--fix` edits the source file in place
 ```bash
 llmlint check README.md --fix
 cat README.md | llmlint check --fix -
+
+# report what would change, write nothing
+llmlint check README.md --fix --dry-run
 ```
 
 | Rule | What it does |

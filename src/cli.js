@@ -40,6 +40,7 @@ function usage() {
   o.push('  --max N                         最多返回 N 条发现');
   o.push('  --fail-on error|warning         CI 达到该级别即返回非零（默认 error）');
   o.push('  --fix                           自动修复可机械处理的规则并原地保存');
+  o.push('  --dry-run                       配合 --fix：只报告将改什么，不写磁盘');
   o.push('  --output file                   写入文件而非标准输出');
   o.push('  --help                          显示本帮助');
   o.push(NL);
@@ -52,7 +53,7 @@ const COMMANDS = ['check', 'score', 'rules', 'version'];
 function parseArgs(argv) {
   const args = {
     command: 'check', files: [], format: 'text', minSeverity: 'info',
-    enable: [], disable: [], max: 0, output: null, failOn: 'error', help: false, fix: false
+    enable: [], disable: [], max: 0, output: null, failOn: 'error', help: false, fix: false, dryRun: false
   };
   let commandResolved = false;
   for (let i = 0; i < argv.length; i++) {
@@ -66,6 +67,7 @@ function parseArgs(argv) {
     else if (a === '--output' || a === '-o') args.output = argv[++i];
     else if (a === '--fail-on') args.failOn = argv[++i];
     else if (a === '--fix') args.fix = true;
+    else if (a === '--dry-run') args.dryRun = true;
     else if (a.length > 1 && a.charAt(0) === '-') throw new Error('未知选项: ' + a);
     else if (!commandResolved) {
       commandResolved = true;
@@ -187,11 +189,11 @@ function main() {
     if (args.fix) {
       const fx = fixDocument(text, { enable: args.enable, disable: args.disable });
       if (fx.fixes.length > 0) {
-        if (file === '-') { process.stdout.write(fx.text); continue; }
-        writeFileSync(resolve(file), fx.text, 'utf8');
+        if (file === '-' && !args.dryRun) { process.stdout.write(fx.text); continue; }
+        if (!args.dryRun) writeFileSync(resolve(file), fx.text, 'utf8');
         text = fx.text;
         fixInfo = fx.fixes;
-        fixNote = '已修复  ' + fx.fixes.map(function (f) { return f.rule + ' x' + f.count; }).join(', ');
+        fixNote = (args.dryRun ? '将修复（未写入）  ' : '已修复  ') + fx.fixes.map(function (f) { return f.rule + ' x' + f.count; }).join(', ');
       }
     }
 

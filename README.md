@@ -155,6 +155,9 @@ llmlint check README.md --format md --output report.md
 ```bash
 llmlint check README.md --fix
 cat README.md | llmlint check --fix -
+
+# 只报告将改什么，不动文件
+llmlint check README.md --fix --dry-run
 ```
 
 | 规则 | 做法 |
