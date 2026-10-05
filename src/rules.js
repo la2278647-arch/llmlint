@@ -346,9 +346,9 @@ rule({
     const lines = text.split(NL);
     for (let i = 0; i < lines.length; i++) {
       if (/^[ \t]*$/.test(lines[i])) continue;
-      const m = lines[i].match(/[ \t]+$/);
+      const m = lines[i].match(/[ \t]+(?=\r?$)/);
       if (m) {
-        out.push({ message: '行尾有 ' + m[0].length + ' 个多余空格', line: i + 1, column: lines[i].length - m[0].length + 1, snippet: '' });
+        out.push({ message: '行尾有 ' + m[0].length + ' 个多余空格', line: i + 1, column: m.index + 1, snippet: '' });
       }
     }
     return out;

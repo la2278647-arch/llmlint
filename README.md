@@ -148,14 +148,35 @@ llmlint check README.md --format json
 llmlint check README.md --format md --output report.md
 ```
 
+## 自动修复
+
+三条规则是纯机械变换，`--fix` 直接改写源文件，然后照常评分：
+
+```bash
+llmlint check README.md --fix
+cat README.md | llmlint check --fix -
+```
+
+| 规则 | 做法 |
+| --- | --- |
+| `trailing-space` | 删掉行尾空格与制表符 |
+| `cjk-spacing` | 中文与字母数字之间补一个空格 |
+| `no-final-newline` | 末尾补一个换行 |
+
+代码块与行内代码一律跳过，`CRLF` 换行原样保留，重复运行不会继续改动。修不了的规则照常报告，退出码仍按 `--fail-on` 计算。
+
 ## 作为库使用
 
 ```js
-import { checkDocument } from 'llmlint';
+import { checkDocument, fixDocument } from 'llmlint';
 
 const result = checkDocument(text, { minSeverity: 'warning' });
 console.log(result.score);      // { score: 85, grade: 'B', counts: {...} }
 console.log(result.findings);   // [{ rule, severity, message, line, column, snippet }]
+
+const fixed = fixDocument(text);   // 只处理能机械修复的三条
+console.log(fixed.fixes);          // [{ rule: 'cjk-spacing', count: 4 }]
+console.log(fixed.text);
 ```
 
 ## MCP server

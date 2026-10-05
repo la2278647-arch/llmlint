@@ -146,14 +146,35 @@ llmlint check README.md --format json
 llmlint check README.md --format md --output report.md
 ```
 
+## Auto-fix
+
+Three rules are pure mechanical rewrites. `--fix` edits the source file in place, then scores it as usual:
+
+```bash
+llmlint check README.md --fix
+cat README.md | llmlint check --fix -
+```
+
+| Rule | What it does |
+| --- | --- |
+| `trailing-space` | strips trailing spaces and tabs |
+| `cjk-spacing` | inserts a space between CJK and letters or digits |
+| `no-final-newline` | appends a newline at the end of the file |
+
+Fenced blocks and inline code are never touched. `CRLF` line endings are preserved. Running it twice changes nothing. Rules that cannot be fixed mechanically are still reported, and the exit code still follows `--fail-on`.
+
 ## As a library
 
 ```js
-import { checkDocument } from 'llmlint';
+import { checkDocument, fixDocument } from 'llmlint';
 
 const result = checkDocument(text, { minSeverity: 'warning' });
 console.log(result.score);      // { score: 85, grade: 'B', counts: {...} }
 console.log(result.findings);   // [{ rule, severity, message, line, column, snippet }]
+
+const fixed = fixDocument(text);   // only the three mechanical rules
+console.log(fixed.fixes);          // [{ rule: 'cjk-spacing', count: 4 }]
+console.log(fixed.text);
 ```
 
 ## MCP server

@@ -2,6 +2,7 @@
 
 import { RULES } from './rules.js';
 import { scoreFindings, severityOrder } from './score.js';
+import { fixDocument, FIXABLE } from './fix.js';
 
 /**
  * 检查一段文本，返回发现列表与评分。
@@ -57,5 +58,5 @@ export function checkDocument(text, options) {
   };
 }
 
-export { RULES, scoreFindings, severityOrder };
+export { RULES, scoreFindings, severityOrder, fixDocument, FIXABLE };
 export default checkDocument;

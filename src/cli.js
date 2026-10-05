@@ -7,7 +7,7 @@
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { checkDocument, RULES } from './index.js';
+import { checkDocument, RULES, fixDocument } from './index.js';
 
 const NL = String.fromCharCode(10);
 const BT = String.fromCharCode(96);
@@ -39,6 +39,7 @@ function usage() {
   o.push('  --disable a,b,c                 跳过指定规则');
   o.push('  --max N                         最多返回 N 条发现');
   o.push('  --fail-on error|warning         CI 达到该级别即返回非零（默认 error）');
+  o.push('  --fix                           自动修复可机械处理的规则并原地保存');
   o.push('  --output file                   写入文件而非标准输出');
   o.push('  --help                          显示本帮助');
   o.push(NL);
@@ -51,7 +52,7 @@ const COMMANDS = ['check', 'score', 'rules', 'version'];
 function parseArgs(argv) {
   const args = {
     command: 'check', files: [], format: 'text', minSeverity: 'info',
-    enable: [], disable: [], max: 0, output: null, failOn: 'error', help: false
+    enable: [], disable: [], max: 0, output: null, failOn: 'error', help: false, fix: false
   };
   let commandResolved = false;
   for (let i = 0; i < argv.length; i++) {
@@ -64,7 +65,8 @@ function parseArgs(argv) {
     else if (a === '--max') args.max = parseInt(argv[++i], 10) || 0;
     else if (a === '--output' || a === '-o') args.output = argv[++i];
     else if (a === '--fail-on') args.failOn = argv[++i];
-    else if (a.charAt(0) === '-') throw new Error('未知选项: ' + a);
+    else if (a === '--fix') args.fix = true;
+    else if (a.length > 1 && a.charAt(0) === '-') throw new Error('未知选项: ' + a);
     else if (!commandResolved) {
       commandResolved = true;
       if (COMMANDS.indexOf(a) !== -1) args.command = a;
@@ -180,6 +182,19 @@ function main() {
     try { text = readInput(file); }
     catch (e) { console.error(e.message); exitCode = Math.max(exitCode, 1); continue; }
 
+    let fixNote = '';
+    let fixInfo = null;
+    if (args.fix) {
+      const fx = fixDocument(text, { enable: args.enable, disable: args.disable });
+      if (fx.fixes.length > 0) {
+        if (file === '-') { process.stdout.write(fx.text); continue; }
+        writeFileSync(resolve(file), fx.text, 'utf8');
+        text = fx.text;
+        fixInfo = fx.fixes;
+        fixNote = '已修复  ' + fx.fixes.map(function (f) { return f.rule + ' x' + f.count; }).join(', ');
+      }
+    }
+
     const result = checkDocument(text, {
       enable: args.enable, disable: args.disable,
       minSeverity: args.minSeverity, maxFindings: args.max
@@ -188,14 +203,15 @@ function main() {
     let body;
     if (args.command === 'score') {
       body = file + '  ' + result.score.score + '/100  ' + result.score.grade +
-        '  ' + result.findings.length + ' findings';
+        '  ' + result.findings.length + ' findings' + (fixNote ? '  ' + fixNote : '');
     } else if (args.format === 'json') {
-      body = JSON.stringify({ file: file, score: result.score, findings: result.findings, summary: result.summary }, null, 2);
+      body = JSON.stringify({ file: file, score: result.score, findings: result.findings, summary: result.summary, fixes: fixInfo }, null, 2);
     } else if (args.format === 'md') {
       body = formatMd(result, file);
     } else {
       body = formatText(result, file);
     }
+    if (fixNote && args.command !== 'score' && args.format !== 'json') body = body + NL + fixNote;
     parts.push(body);
 
     if (result.score.counts.error > 0) exitCode = Math.max(exitCode, 2);
