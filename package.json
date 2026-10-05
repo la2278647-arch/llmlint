@@ -1,0 +1,53 @@
+{
+  "name": "llmlint",
+  "version": "0.1.0",
+  "description": "LLM 输出质量检查器：24 条规则、0-100 评分、CLI 与 MCP server，零运行时依赖",
+  "type": "module",
+  "bin": {
+    "llmlint": "src/cli.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./engine": "./src/engine.js",
+    "./rules": "./src/rules.js",
+    "./score": "./src/score.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md",
+    "README.en.md",
+    "examples/"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "demo": "node src/cli.js check examples/demo-bad.md",
+    "mcp": "node src/mcp/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "llm",
+    "ai",
+    "markdown",
+    "linter",
+    "quality",
+    "mcp",
+    "cli",
+    "code-review"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/la2278647-arch/llmlint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/la2278647-arch/llmlint/issues"
+  },
+  "homepage": "https://github.com/la2278647-arch/llmlint",
+  "devDependencies": {},
+  "dependencies": {}
+}
