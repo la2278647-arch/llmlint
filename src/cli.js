@@ -6,8 +6,9 @@
 // =====================================================================
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { checkDocument, RULES, fixDocument } from './index.js';
+import { loadConfig, ConfigError, effectiveOptions, resolveOptions, normalizePath } from './config.js';
 
 const NL = String.fromCharCode(10);
 const BT = String.fromCharCode(96);
@@ -31,6 +32,7 @@ function usage() {
   o.push('  llmlint score <file> [...]     只看评分');
   o.push('  llmlint rules                  列出全部规则');
   o.push('  llmlint version                显示版本号');
+  o.push('  llmlint config [path]          显示解析出的配置与生效选项');
   o.push(NL);
   o.push('选项:');
   o.push('  --format text|md|json           输出格式（默认 text）');
@@ -41,19 +43,25 @@ function usage() {
   o.push('  --fail-on error|warning         CI 达到该级别即返回非零（默认 error）');
   o.push('  --fix                           自动修复可机械处理的规则并原地保存');
   o.push('  --dry-run                       配合 --fix：只报告将改什么，不写磁盘');
+  o.push('  --config file                   指定配置文件（默认从当前目录向上查找）');
+  o.push('  --no-config                     不使用配置文件');
   o.push('  --output file                   写入文件而非标准输出');
   o.push('  --help                          显示本帮助');
+  o.push(NL);
+  o.push('配置文件：从当前目录向上逐级查找 llmlint.json 或 .llmlintrc.json，');
+  o.push('优先级为命令行参数 > 配置文件 > 默认值。配置项见 llmlint config。');
   o.push(NL);
   o.push('输入支持文件路径或 -（标准输入）。零依赖、纯本地、不上传任何内容。');
   return o.join(NL);
 }
 
-const COMMANDS = ['check', 'score', 'rules', 'version'];
+const COMMANDS = ['check', 'score', 'rules', 'version', 'config'];
 
 function parseArgs(argv) {
   const args = {
-    command: 'check', files: [], format: 'text', minSeverity: 'info',
-    enable: [], disable: [], max: 0, output: null, failOn: 'error', help: false, fix: false, dryRun: false
+    command: 'check', files: [], format: 'text', minSeverity: undefined,
+    enable: undefined, disable: undefined, max: undefined, output: null,
+    failOn: undefined, help: false, fix: false, dryRun: false, config: null, noConfig: false
   };
   let commandResolved = false;
   for (let i = 0; i < argv.length; i++) {
@@ -68,6 +76,8 @@ function parseArgs(argv) {
     else if (a === '--fail-on') args.failOn = argv[++i];
     else if (a === '--fix') args.fix = true;
     else if (a === '--dry-run') args.dryRun = true;
+    else if (a === '--config') args.config = argv[++i];
+    else if (a === '--no-config') args.noConfig = true;
     else if (a.length > 1 && a.charAt(0) === '-') throw new Error('未知选项: ' + a);
     else if (!commandResolved) {
       commandResolved = true;
@@ -150,6 +160,34 @@ function formatRules() {
   return o.join(NL);
 }
 
+// 文件相对配置根的路径；标准输入返回空串，不参与路径匹配。
+function relPathOf(config, file) {
+  if (!file || file === '-') return '';
+  const root = config ? config.root : process.cwd();
+  return normalizePath(relative(root, resolve(file)));
+}
+
+// config 命令：打印找到的配置文件、命中的 rules 块、以及合并后的生效选项。
+function formatConfig(config, args) {
+  const rel = relPathOf(config, args.files[0]);
+  const matched = resolveOptions(config, rel).matched;
+  const eff = effectiveOptions(args, config, rel);
+  return JSON.stringify({
+    source: config ? config.source : null,
+    root: config ? config.root : null,
+    path: rel ? rel : null,
+    matched: matched,
+    effective: {
+      enable: eff.enable,
+      disable: eff.disable,
+      'min-severity': eff.minSeverity,
+      'max-findings': eff.maxFindings,
+      'fail-on': eff.failOn,
+      severity: eff.severity
+    }
+  }, null, 2);
+}
+
 function emit(body, output) {
   if (output) {
     writeFileSync(resolve(output), body + NL, 'utf8');
@@ -168,6 +206,16 @@ function main() {
   if (args.help) { console.log(usage()); return; }
   if (args.command === 'version') { console.log(pkg.version); return; }
   if (args.command === 'rules') { emit(formatRules(), args.output); return; }
+
+  let config = null;
+  if (!args.noConfig) {
+    try { config = loadConfig(process.cwd(), args.config); }
+    catch (e) {
+      if (e instanceof ConfigError) { console.error(e.message); process.exit(1); }
+      throw e;
+    }
+  }
+  if (args.command === 'config') { emit(formatConfig(config, args), args.output); return; }
   if (args.command !== 'check' && args.command !== 'score') {
     console.error('未知命令: ' + args.command + NL + NL + usage());
     process.exit(1);
@@ -184,10 +232,12 @@ function main() {
     try { text = readInput(file); }
     catch (e) { console.error(e.message); exitCode = Math.max(exitCode, 1); continue; }
 
+    const eff = effectiveOptions(args, config, relPathOf(config, file));
+
     let fixNote = '';
     let fixInfo = null;
     if (args.fix) {
-      const fx = fixDocument(text, { enable: args.enable, disable: args.disable });
+      const fx = fixDocument(text, { enable: eff.enable, disable: eff.disable });
       if (fx.fixes.length > 0) {
         if (file === '-' && !args.dryRun) { process.stdout.write(fx.text); continue; }
         if (!args.dryRun) writeFileSync(resolve(file), fx.text, 'utf8');
@@ -198,8 +248,9 @@ function main() {
     }
 
     const result = checkDocument(text, {
-      enable: args.enable, disable: args.disable,
-      minSeverity: args.minSeverity, maxFindings: args.max
+      enable: eff.enable, disable: eff.disable,
+      minSeverity: eff.minSeverity, maxFindings: eff.maxFindings,
+      severity: eff.severity
     });
 
     let body;
@@ -214,10 +265,11 @@ function main() {
       body = formatText(result, file);
     }
     if (fixNote && args.command !== 'score' && args.format !== 'json') body = body + NL + fixNote;
+    if (config && args.command !== 'score' && args.format !== 'json') body = body + NL + '配置    ' + config.source;
     parts.push(body);
 
     if (result.score.counts.error > 0) exitCode = Math.max(exitCode, 2);
-    else if (result.score.counts.warning > 0 && args.failOn === 'warning') exitCode = Math.max(exitCode, 1);
+    else if (result.score.counts.warning > 0 && eff.failOn === 'warning') exitCode = Math.max(exitCode, 1);
   }
 
   emit(parts.join(NL + NL), args.output);

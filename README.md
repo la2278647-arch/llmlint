@@ -168,6 +168,42 @@ llmlint check README.md --fix --dry-run
 
 代码块与行内代码一律跳过，`CRLF` 换行原样保留，重复运行不会继续改动。修不了的规则照常报告，退出码仍按 `--fail-on` 计算。
 
+## 项目级配置
+
+规则集应该进版本库，而不是靠命令行维护。在仓库根目录放一个 `llmlint.json` 或 `.llmlintrc.json`，从当前目录向上逐级查找，找到第一个即用：
+
+```json
+{
+  "min-severity": "warning",
+  "max-findings": 100,
+  "rules": [
+    { "path": ["**/*.md"], "disable": ["cjk-spacing"] },
+    { "path": ["docs/**"], "min-severity": "info" }
+  ]
+}
+```
+
+配置项有 `min-severity`、`max-findings`、`fail-on`、`enable`、`disable`、`severity`。其中 `severity` 可以改一条规则的严重度，扣分与阈值会跟着变：
+
+```json
+{ "severity": { "sentence-too-long": "error" } }
+```
+
+`rules` 数组按声明顺序合并，后面的标量覆盖前面的，`enable` 与 `disable` 取并集。`path` 数组是或关系，省略 `path` 的块对任何文件生效。`**` 匹配零个或多个路径段，`*` 与 `?` 不跨 `/`。
+
+优先级是命令行参数大于配置文件大于默认值。命令行传了 `--enable` 时视为白名单，配置里的 `--disable` 不再适用。
+
+配置写错会立刻报出来，并指出第几行第几列和原因：
+
+```bash
+llmlint check README.md
+# llmlint.json: 不是合法 JSON（第 3 行 2 列）：Unexpected token ...
+
+llmlint config README.md      # 看实际生效的设置
+llmlint check --config l.json # 指定配置文件
+llmlint check --no-config f.md # 跳过查找
+```
+
 ## 作为库使用
 
 ```js

@@ -1,7 +1,7 @@
 {
   "name": "llmlint",
-  "version": "0.2.0",
-  "description": "LLM 输出质量检查器：24 条规则、0-100 评分、CLI 与 MCP server，零运行时依赖",
+  "version": "0.3.0",
+  "description": "LLM 输出质量检查器：24 条规则、0-100 评分、CLI 与 MCP server、项目级配置，零运行时依赖",
   "type": "module",
   "bin": {
     "llmlint": "src/cli.js"
@@ -13,6 +13,7 @@
     "./rules": "./src/rules.js",
     "./score": "./src/score.js",
     "./fix": "./src/fix.js",
+    "./config": "./src/config.js",
     "./package.json": "./package.json"
   },
   "files": [

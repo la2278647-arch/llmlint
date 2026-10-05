@@ -166,6 +166,42 @@ llmlint check README.md --fix --dry-run
 
 Fenced blocks and inline code are never touched. `CRLF` line endings are preserved. Running it twice changes nothing. Rules that cannot be fixed mechanically are still reported, and the exit code still follows `--fail-on`.
 
+## Project config
+
+A rule set belongs in version control, not on a command line. Drop an `llmlint.json` or `.llmlintrc.json` at the repository root; it is discovered by walking up from the current directory, and the first match wins:
+
+```json
+{
+  "min-severity": "warning",
+  "max-findings": 100,
+  "rules": [
+    { "path": ["**/*.md"], "disable": ["cjk-spacing"] },
+    { "path": ["docs/**"], "min-severity": "info" }
+  ]
+}
+```
+
+Keys are `min-severity`, `max-findings`, `fail-on`, `enable`, `disable` and `severity`. The `severity` map retunes a rule, and both the penalty and the `--min-severity` threshold follow it:
+
+```json
+{ "severity": { "sentence-too-long": "error" } }
+```
+
+The `rules` array merges in declaration order: later scalars win, and `enable` plus `disable` are unions. A `path` array is an OR, and a block with no `path` applies to every file. `**` matches zero or more path segments; `*` and `?` never cross a slash.
+
+Precedence is command line over config file over defaults. Passing `--enable` on the command line counts as an allow-list, so a `--disable` from the config no longer applies.
+
+Bad config fails fast, with the line, column and reason:
+
+```bash
+llmlint check README.md
+# llmlint.json: not valid JSON (line 3 column 2): Unexpected token ...
+
+llmlint config README.md      # show what is actually in effect
+llmlint check --config l.json # explicit config file
+llmlint check --no-config f.md # skip discovery
+```
+
 ## As a library
 
 ```js

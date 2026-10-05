@@ -2,6 +2,32 @@
 
 本项目遵循语义化版本与 Keep a Changelog。
 
+## [0.3.0] - 2026-10-05
+
+### 新增
+
+**项目级配置**
+
+- 支持 `llmlint.json` 与 `.llmlintrc.json`，从当前目录向上逐级查找，找到第一个即停
+- `rules` 数组按路径 glob 分区，按声明顺序合并，后面的标量覆盖前面的
+- 配置文件里的 `severity` 可覆盖任意规则的严重度，连带影响扣分与 `--min-severity` 阈值
+- `--config <file>` 指定配置文件，`--no-config` 完全跳过查找
+- 新增 `llmlint config [path]` 命令，输出配置文件位置、命中的规则块与合并后的生效选项
+- 库入口新增 `loadConfig` / `parseConfig` / `resolveOptions` / `effectiveOptions` / `globMatch` / `ConfigError`，`./config` 子路径同样可用
+
+**错误提示**
+
+- 配置不是合法 JSON 时报出第几行第几列与原因
+- 未知配置项、未知规则 id、非法严重度、非法 `max-findings` 全部给出明确错误并以非零退出
+
+### 变更
+
+- 命令行参数优先级明确为：命令行 > 配置文件 > 默认值
+- 命令行传了 `--enable` 时视为白名单，配置里的 `--disable` 不再适用，避免两者互相抵消
+- `checkDocument` 新增 `severity` 选项
+- 文本与 Markdown 报告末尾显示本次使用的配置文件
+- 测试套件从 74 项扩到 115 项
+
 ## [0.2.0] - 2026-10-05
 
 ### 新增

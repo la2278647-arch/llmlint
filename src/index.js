@@ -13,21 +13,24 @@ import { fixDocument, FIXABLE } from './fix.js';
  * @param {string[]} [options.disable]  跳过这些规则
  * @param {string}   [options.minSeverity] info | warning | error
  * @param {number}   [options.maxFindings]  最多返回多少条发现
+ * @param {object}   [options.severity]     规则 id 到严重度的覆盖映射
  */
 export function checkDocument(text, options) {
   const opts = options || {};
   const disabled = opts.disable || [];
   const enabled = opts.enable || [];
+  const sevMap = opts.severity || {};
   const threshold = severityOrder(opts.minSeverity || 'info');
   const max = opts.maxFindings || 0;
   const findings = [];
   const stats = {};
 
   for (const ruleDef of RULES) {
+    const severity = Object.prototype.hasOwnProperty.call(sevMap, ruleDef.id) ? sevMap[ruleDef.id] : ruleDef.severity;
     let skip = false;
     if (disabled.indexOf(ruleDef.id) !== -1) skip = true;
     if (!skip && enabled.length > 0 && enabled.indexOf(ruleDef.id) === -1) skip = true;
-    if (!skip && severityOrder(ruleDef.severity) < threshold) skip = true;
+    if (!skip && severityOrder(severity) < threshold) skip = true;
     if (skip) { stats[ruleDef.id] = 'skipped'; continue; }
 
     let results = [];
@@ -38,7 +41,7 @@ export function checkDocument(text, options) {
       if (max > 0 && findings.length >= max) break;
       findings.push({
         rule: ruleDef.id,
-        severity: ruleDef.severity,
+        severity: severity,
         message: finding.message,
         line: finding.line || 0,
         column: finding.column || 0,
@@ -59,4 +62,5 @@ export function checkDocument(text, options) {
 }
 
 export { RULES, scoreFindings, severityOrder, fixDocument, FIXABLE };
+export { loadConfig, parseConfig, resolveOptions, effectiveOptions, globMatch, normalizePath, ConfigError } from './config.js';
 export default checkDocument;
