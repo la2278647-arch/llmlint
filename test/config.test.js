@@ -83,6 +83,16 @@ test('parseConfig：语法错误报行号列号与原因', () => {
   });
 });
 
+test('parseConfig：报错信息缺位置时不拼空括号', () => {
+  assert.throws(() => parseConfig('abc'), (e) => {
+    assert.equal(e.name, 'ConfigError');
+    assert.match(e.message, /不是合法 JSON/);
+    assert.match(e.message, /Unexpected token/);
+    assert.ok(e.message.indexOf('（）') === -1, '不应出现空的括号位置：' + e.message);
+    return true;
+  });
+});
+
 test('parseConfig：未知配置项指出行号且带文件路径', () => {
   const bad = '{' + NL + '  "min-severity": "info",' + NL + '  "wrong-key": true' + NL + '}';
   assert.throws(() => parseConfig(bad, 'x.json'), (e) => {
@@ -158,6 +168,17 @@ test('loadConfig：同目录 llmlint.json 优先于 .llmlintrc.json', () => {
   const got = loadConfig(d);
   assert.equal(got.source, cfg);
   assert.equal(got.top.minSeverity, 'warning');
+  cleanup(d);
+});
+
+test('loadConfig：配置文件路径是目录时报 ConfigError', () => {
+  const d = mkd();
+  mkdirSync(join(d, 'llmlint.json'));
+  assert.throws(() => loadConfig(d), (e) => {
+    assert.equal(e.name, 'ConfigError');
+    assert.match(e.message, /无法读取/);
+    return true;
+  });
   cleanup(d);
 });
 

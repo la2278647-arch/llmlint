@@ -21,8 +21,17 @@
 
 ### 其他
 
+**覆盖率审计**
+
+- 用 `node --test --experimental-test-coverage` 量了一遍，`cli.js` 只有 87.7% 行覆盖，`--format md`、`rules`、`score` 三个输出分支和两条错误路径从未被测试
+- 补齐这些分支后行覆盖率升到 99.88%，函数覆盖率 100%
 - 新增 demo-bad 基线锁定测试：25 条发现、评分 0、等级 F
-- 测试套件从 141 项扩到 147 项
+- 测试套件从 141 项扩到 160 项
+
+**删掉两处死代码**
+
+- `cli.js` 里「未知命令」的报错分支不可达：`parseArgs` 只把已知命令设为命令，其余首个参数按文件处理，`command` 保持默认值 `check`。删掉后行为不变，`llmlint foo.md` 仍然按检查文件处理
+- `config.js` 里 `jsonLoc` 按 `position N` 自算行号的回退分支不可达：Node 18 起 V8 的 JSON 报错会带 `line N column M`，所以那一支走不到
 
 ### 影响
 

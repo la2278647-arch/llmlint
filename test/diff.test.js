@@ -253,6 +253,19 @@ test('diff: 无新增时给出明确结论', (t) => {
   assert.match(res.stdout, /本次变更未引入新问题。/);
 });
 
+test('diff --format md：无新增问题时给出干净结论', (t) => {
+  const r = gitdir(t);
+  r.write('docs/a.md', BASE_DOC);
+  r.commit('base');
+  r.write('docs/a.md', BASE_DOC + '补充一行没有问题的说明。' + NL);
+  const res = runCli(r.dir, ['diff', '--enable', 'cjk-spacing', '--format', 'md', 'docs/a.md']);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stdout, /# llmlint diff 报告/);
+  assert.match(res.stdout, /\| 历史遗留（不扣分） \| 1 \|/);
+  assert.match(res.stdout, /本次变更未引入新问题。/);
+  assert.ok(res.stdout.indexOf('本次新增 ---') === -1, '无新增时不应有明细表');
+});
+
 test('diff: Markdown 报告包含遗留数量', (t) => {
   const r = gitdir(t);
   r.write('docs/a.md', BASE_DOC);

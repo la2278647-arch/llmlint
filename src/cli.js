@@ -343,10 +343,9 @@ function main() {
   }
   if (args.command === 'config') { emit(formatConfig(config, args), args.output); return; }
   if (args.command === 'diff') { runDiff(args, config); return; }
-  if (args.command !== 'check' && args.command !== 'score') {
-    console.error('未知命令: ' + args.command + NL + NL + usage());
-    process.exit(1);
-  }
+
+  // 走到这里 command 必为 check 或 score：parseArgs 只会把 COMMANDS 里的词设为命令，
+  // 其余首个位置参数按文件处理，command 保持默认 'check'。
   if (args.files.length === 0) {
     console.error('未指定文件。用法: llmlint check <file> [--format json]');
     process.exit(1);

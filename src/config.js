@@ -71,15 +71,11 @@ export function globMatch(pattern, relPath) {
 
 // ---------- 定位 ----------
 
-// 从 JSON.parse 的错误信息取行号列号；取不到就用 position 自己算。
-function jsonLoc(text, message) {
+// 从 JSON.parse 的错误信息取行号列号；取不到就返回空串。
+// Node 18 起 V8 的 JSON 报错总是带 "line N column M"，不必再按 position 自己算。
+function jsonLoc(message) {
   const m = String(message).match(/line (\d+) column (\d+)/);
   if (m) return '第 ' + m[1] + ' 行 ' + m[2] + ' 列';
-  const p = String(message).match(/position (\d+)/);
-  if (p) {
-    const parts = text.slice(0, Number(p[1])).split(NL);
-    return '第 ' + parts.length + ' 行 ' + (parts[parts.length - 1].length + 1) + ' 列';
-  }
   return '';
 }
 
@@ -164,7 +160,7 @@ export function parseConfig(text, path) {
   try {
     data = JSON.parse(text);
   } catch (e) {
-    const loc = jsonLoc(text, e.message);
+    const loc = jsonLoc(e.message);
     throw new ConfigError(path, '不是合法 JSON' + (loc ? '（' + loc + '）' : '') + '：' + String(e.message).split(NL)[0]);
   }
   const top = readBlock(path, data, text, '顶层', TOP_KEYS);

@@ -88,6 +88,12 @@ test('list_rules 返回全部 24 条规则', async () => {
   assert.ok(/placeholder-text/.test(body[0]));
 });
 
+test('未知工具返回 isError 并说明工具名', async () => {
+  const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'frobnicate', arguments: {} } }]);
+  assert.equal(r.lines[0].result.isError, true);
+  assert.match(JSON.parse(r.lines[0].result.content[0].text).error, /未知工具: frobnicate/);
+});
+
 test('未知方法返回 -32601', async () => {
   const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'no/such' }]);
   assert.equal(r.lines[0].error.code, -32601);
