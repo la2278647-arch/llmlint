@@ -206,6 +206,22 @@ llmlint check --config l.json # 指定配置文件
 llmlint check --no-config f.md # 跳过查找
 ```
 
+
+### 日文文档预设
+
+日文项目通常要关掉 `cjk-spacing`，日文里假名与拉丁字符之间不加空格。日文那两条规则不用显式开启，它们自带假名门控：
+
+``` json
+{
+  "rules": [
+    { "path": ["**/*.md"], "disable": ["cjk-spacing"] }
+  ]
+}
+```
+
+`cjk-spacing` 只在汉字与拉丁字符相邻时报，假名与拉丁相邻不算问题。`ja-halfwidth-punct` 只在行内出现假名时才检查。所以中日英混排的仓库不需要任何配置。
+
+示例目录里的 `demo-ja.md` 是一份零发现的日文文档，可以用它确认规则没有误报。
 ## 增量检查
 
 只关心「这次改动引入了什么新问题」。`diff` 跑完整检查，再按 git 的改动行范围把发现拆成两组：新增问题扣分并决定退出码，遗留问题只在报告里给数量。
@@ -317,6 +333,7 @@ test/
   mcp.test.js        协议（10）
 examples/
   demo-good.md   零发现的干净文档
+  demo-ja.md     零发现的日文文档
   demo-bad.md    14 条规则、25 条发现
   fix-target.md  修复前后的对照
 ```

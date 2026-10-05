@@ -10,6 +10,7 @@ const NL = String.fromCharCode(10);
 const BT = String.fromCharCode(96);
 const BAD = readFileSync('examples/demo-bad.md', 'utf8');
 const GOOD = readFileSync('examples/demo-good.md', 'utf8');
+const JA = readFileSync('examples/demo-ja.md', 'utf8');
 
 const of = (findings, id) => findings.filter(f => f.rule === id);
 
@@ -218,6 +219,39 @@ test('demo-bad 基线锁定：25 条发现、评分 0、等级 F', () => {
   assert.equal(r.findings.length, 25);
   assert.equal(r.score.score, 0);
   assert.equal(r.score.grade, 'F');
+});
+
+test('demo-ja 基线锁定：正确的日文文档零发现、满分 A', () => {
+  const r = checkDocument(JA);
+  assert.equal(r.findings.length, 0);
+  assert.equal(r.score.score, 100);
+  assert.equal(r.score.grade, 'A');
+});
+
+test('英文规则不会误报正确的日文文档', () => {
+  const r = checkDocument(JA);
+  assert.equal(of(r.findings, 'cjk-spacing').length, 0, '假名与拉丁相邻不算缺空格');
+  assert.equal(of(r.findings, 'sentence-too-long').length, 0);
+  assert.equal(of(r.findings, 'number-without-source').length, 0);
+});
+
+test('cjk-spacing 对假名与拉丁相邻不误报，对汉字与拉丁相邻要报', () => {
+  assert.equal(checkDocument('API の設定です。' + NL, { enable: ['cjk-spacing'] }).findings.length, 0);
+  assert.equal(checkDocument('機械Learningは便利です。' + NL, { enable: ['cjk-spacing'] }).findings.length, 1);
+});
+
+test('标题规则不匹配代码块里的注释', () => {
+  const t = '# 顶级' + NL + NL + '## 二级' + NL + NL + BT.repeat(3) + ' bash' + NL + '# 这是一个注释' + NL + '# 这也是一个注释' + NL + BT.repeat(3) + NL + NL + '### 三级' + NL;
+  const r = checkDocument(t);
+  assert.equal(of(r.findings, 'heading-jump').length, 0, 'bash 注释不算标题');
+  assert.equal(of(r.findings, 'repeated-heading').length, 0, '重复注释不算重复标题');
+});
+
+test('标题规则仍然能匹配真实标题的跳级与重复', () => {
+  const t = '# 一级' + NL + NL + '### 三级' + NL + NL + '## 二级' + NL + NL + '## 二级' + NL;
+  const r = checkDocument(t);
+  assert.equal(of(r.findings, 'heading-jump').length, 1);
+  assert.equal(of(r.findings, 'repeated-heading').length, 1);
 });
 
 test('enable 只运行指定规则', () => {

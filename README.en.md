@@ -204,6 +204,25 @@ llmlint check --config l.json # explicit config file
 llmlint check --no-config f.md # skip discovery
 ```
 
+
+### Japanese documents
+
+Japanese projects usually want `cjk-spacing` off. In Japanese there is no space between kana and Latin characters. The two Japanese rules need no opt-in; they gate themselves on kana:
+
+``` json
+{
+  "rules": [
+    { "path": ["**/*.md"], "disable": ["cjk-spacing"] }
+  ]
+}
+```
+
+`cjk-spacing` fires only when a CJK ideograph sits next to Latin. Kana next to Latin is fine. `ja-halfwidth-punct` only runs on lines containing kana.
+
+A repo mixing Chinese, English, and Japanese needs no config at all.
+
+`examples/demo-ja.md` is a Japanese document with zero findings. Use it to confirm the rules are not false-positiving.
+
 ## Incremental checking
 
 Only "what did this change introduce?" matters in a pull request. `diff` runs the full check, then splits findings by git's changed line ranges: new findings deduct and drive the exit code, pre-existing ones are only counted.
@@ -321,6 +340,7 @@ test/
 
 examples/
   demo-good.md   clean document, zero findings
+  demo-ja.md     clean Japanese document, zero findings
   demo-bad.md    14 rules, 25 findings
   fix-target.md  before and after autofix
 ```

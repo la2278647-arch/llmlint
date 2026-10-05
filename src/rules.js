@@ -130,9 +130,10 @@ rule({
 rule({
   id: 'heading-jump', severity: 'warning', description: '标题层级跳级',
   check: function (text) {
+    // 屏蔽代码块：bash 注释里的 # 文本不是标题。
     const out = [];
     let prev = 0;
-    for (const m of scan(text, HEADING_RE)) {
+    for (const m of scan(maskCode(text), HEADING_RE)) {
       const level = m[0].match(/^#+/)[0].length;
       if (prev > 0 && level > prev + 1) {
         out.push(hit(text, m, '标题层级跳级（H' + prev + ' -> H' + level + '），应逐级递进'));
@@ -147,9 +148,10 @@ rule({
 rule({
   id: 'repeated-heading', severity: 'warning', description: '重复的标题',
   check: function (text) {
+    // 屏蔽代码块：示例里反复出现的 # 注释不是重复标题。
     const out = [];
     const seen = new Set();
-    for (const m of scan(text, HEADING_RE)) {
+    for (const m of scan(maskCode(text), HEADING_RE)) {
       const title = m[1].trim();
       if (seen.has(title)) {
         out.push(hit(text, m, '重复的标题: "' + short(title, 40) + '"'));
