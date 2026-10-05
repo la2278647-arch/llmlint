@@ -38,8 +38,7 @@
 **工程化**
 
 - 48 个自动化测试，Node 18 / 20 / 22 / 24 全绿
-- GitHub Actions 多版本矩阵 + Docker 镜像构建
-- Dockerfile（node:22-alpine，约 50MB）
+- GitHub Actions 多版本矩阵（Node 18 / 20 / 22 / 24），每次推送与 Release 时全量跑测试
 - 中英双语文档
 
 ### 设计决定
