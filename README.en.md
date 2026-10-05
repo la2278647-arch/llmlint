@@ -34,6 +34,23 @@ llmlint closes that gap.
 - **MCP server** with five tools including auto-fix, hand-written stdio JSON-RPC, no SDK
 - **Zero dependencies, fully local**: your text never leaves the machine
 
+
+## Performance
+
+All 26 rules are pure string and regex work. There is no Markdown parser and no runtime dependency.
+
+Measured on one machine with Node v24 (`npm run bench`, median of 200 rounds):
+
+``` text
+target          kB   median(ms)   docs/sec
+demo-bad.md      0.6       0.088    11429
+README.md        9.3       2.372      422
+synthetic-64k   65.3      17.448       57
+```
+
+Roughly 0.27 ms per KB on large documents, growing linearly with size; the cost is dominated by the regex passes, not parsing. Add `--json` for machine-readable output.
+
+Numbers depend on the machine and Node version, so only same-machine comparisons are meaningful. The benchmark ships with the repository.
 ## Install
 
 ```bash

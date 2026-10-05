@@ -7,12 +7,38 @@
 const NL = String.fromCharCode(10);
 const BT = String.fromCharCode(96);
 
+// 行首偏移表：一次 O(n) 建好，之后每个索引 O(log n) 定位。
+// 原来的写法每次调用都 slice + split 全文，在规则循环里调用会退化成 O(n²)。
+const lineMaps = new Map();
+
+function lineMapOf(text) {
+  let starts = lineMaps.get(text);
+  if (starts === undefined) {
+    starts = [0];
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) starts.push(i + 1);
+    }
+    lineMaps.set(text, starts);
+    // 只留最近几个文档的偏移表，长跑进程不会越攒越多。
+    while (lineMaps.size > 8) lineMaps.delete(lineMaps.keys().next().value);
+  }
+  return starts;
+}
+
+function findLine(starts, index) {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid] <= index) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}
+
 function lineCol(text, index) {
-  const before = text.slice(0, index);
-  const line = before.split(NL).length;
-  const nl = before.lastIndexOf(NL);
-  const column = nl === -1 ? index + 1 : index - nl;
-  return { line: line, column: column };
+  const starts = lineMapOf(text);
+  const lo = findLine(starts, index);
+  return { line: lo + 1, column: index - starts[lo] + 1 };
 }
 
 function snippet(text, index) {

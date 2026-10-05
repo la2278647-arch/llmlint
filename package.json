@@ -22,11 +22,13 @@
     "LICENSE",
     "README.md",
     "README.en.md",
-    "examples/"
+    "examples/",
+    "bench/"
   ],
   "scripts": {
     "test": "node --test test/*.test.js",
     "demo": "node src/cli.js check examples/demo-bad.md",
+    "bench": "node bench/benchmark.mjs",
     "mcp": "node src/mcp/server.js"
   },
   "engines": {
@@ -46,7 +48,8 @@
     "japanese",
     "cjk",
     "katakana",
-    "i18n"
+    "i18n",
+    "performance"
   ],
   "license": "MIT",
   "repository": {
