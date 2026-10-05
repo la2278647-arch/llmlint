@@ -81,10 +81,10 @@ test('lint_file 检查本地示例文件', async () => {
   assert.equal(body.score.score, 100);
 });
 
-test('list_rules 返回全部 24 条规则', async () => {
+test('list_rules 返回全部 26 条规则', async () => {
   const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_rules', arguments: {} } }]);
   const body = JSON.parse(r.lines[0].result.content[0].text);
-  assert.equal(body.length, 24);
+  assert.equal(body.length, 26);
   assert.ok(/placeholder-text/.test(body[0]));
 });
 

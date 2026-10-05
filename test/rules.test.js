@@ -13,8 +13,8 @@ const GOOD = readFileSync('examples/demo-good.md', 'utf8');
 
 const of = (findings, id) => findings.filter(f => f.rule === id);
 
-test('共 24 条规则且严重度合法', () => {
-  assert.equal(RULES.length, 24);
+test('共 26 条规则且严重度合法', () => {
+  assert.equal(RULES.length, 26);
   for (const r of RULES) {
     assert.ok(['info', 'warning', 'error'].indexOf(r.severity) !== -1, r.id);
     assert.equal(typeof r.check, 'function', r.id);
@@ -47,7 +47,7 @@ test('干净文档零发现满分', () => {
   assert.equal(r.findings.length, 0);
   assert.equal(r.score.score, 100);
   assert.equal(r.score.grade, 'A');
-  assert.equal(r.summary.checked, 24);
+  assert.equal(r.summary.checked, 26);
 });
 
 // 每条规则的正向用例
@@ -75,7 +75,9 @@ const CASES = [
   ['trailing-space', 'abc  ' + NL],
   ['table-misaligned', '| a | b |' + NL + '| --- | --- |' + NL + '| c | d | e |' + NL],
   ['number-without-source', '效果提升了 45%。' + NL],
-  ['no-final-newline', 'abc']
+  ['no-final-newline', 'abc'],
+  ['ja-halfwidth-punct', 'これはテスト,です。' + NL],
+  ['ja-hankaku-kana', 'サーバー' + String.fromCharCode(0xff71) + 'テスト' + NL]
 ];
 
 for (const [id, text] of CASES) {
@@ -85,6 +87,69 @@ for (const [id, text] of CASES) {
     assert.ok(hits.length > 0, '规则 ' + id + ' 未触发；实际发现: ' + r.findings.map(f => f.rule).join(','));
   });
 }
+
+test('日文半角标点：小数点与千分位不报', () => {
+  const r = checkDocument('スコアは99.9%で、予算は1,000万円です。' + NL, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('日文半角标点：只有包含假名的行才检查', () => {
+  const t = 'これはテスト,です。' + NL + 'This is a test, with a comma, ok.' + NL;
+  const r = checkDocument(t, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings.length, 1);
+  assert.equal(r.findings[0].line, 1);
+});
+
+test('日文半角标点：URL 内的标点不报', () => {
+  const t = '参考 https://example.com?a=1,b=2 のページ。' + NL;
+  const r = checkDocument(t, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('日文半角标点：代码块内不报', () => {
+  const t = BT.repeat(3) + NL + 'console.log("a,b,c.");' + NL + BT.repeat(3) + NL + NL + 'これはテストです。' + NL;
+  const r = checkDocument(t, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('日文半角标点：多处只报一条', () => {
+  const t = 'これはテスト,です,か?,本当?!' + NL;
+  const r = checkDocument(t, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings.length, 1);
+  assert.match(r.findings[0].message, /共 6 处/);
+});
+
+test('日文半角标点：三类标点各自触发', () => {
+  for (const ch of [',', '.', '!']) {
+    const r = checkDocument('これはテスト' + ch + 'です。' + NL, { enable: ['ja-halfwidth-punct'] });
+    assert.equal(r.findings.length, 1, '字符 ' + ch);
+  }
+});
+
+test('日文半角标点：行号列号定位准确', () => {
+  const r = checkDocument('正常。' + NL + 'これはテスト,です。' + NL, { enable: ['ja-halfwidth-punct'] });
+  assert.equal(r.findings[0].line, 2);
+  assert.equal(r.findings[0].column, 7);
+});
+
+test('半角片假名：只在两种宽度混用时报', () => {
+  const half = String.fromCharCode(0xff71) + String.fromCharCode(0xff90) + String.fromCharCode(0xff95);
+  assert.equal(checkDocument(half + NL, { enable: ['ja-hankaku-kana'] }).findings.length, 0, '通篇半角不报');
+  assert.equal(checkDocument('サーバーテストアプリケーション' + NL, { enable: ['ja-hankaku-kana'] }).findings.length, 0, '通篇全角不报');
+  assert.equal(checkDocument('サーバー' + String.fromCharCode(0xff70) + 'テスト' + NL, { enable: ['ja-hankaku-kana'] }).findings.length, 1, '混用要报');
+});
+
+test('半角片假名：代码块内不报', () => {
+  const t = BT.repeat(3) + NL + 'const k = "' + String.fromCharCode(0xff70) + '";' + NL + BT.repeat(3) + NL + NL + 'サーバーです。' + NL;
+  const r = checkDocument(t, { enable: ['ja-hankaku-kana'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('半角片假名：日文标点规则与片假名规则互不干扰', () => {
+  const r = checkDocument('これはテストです。サーバー' + String.fromCharCode(0xff70) + 'です。' + NL);
+  assert.equal(of(r.findings, 'ja-halfwidth-punct').length, 0);
+  assert.equal(of(r.findings, 'ja-hankaku-kana').length, 1);
+});
 
 test('规则 id 与 CASES 覆盖一致', () => {
   const covered = new Set(CASES.map(c => c[0]));
@@ -201,7 +266,7 @@ test('每条发现都带行号、严重度与规则 id', () => {
 
 test('规则抛异常时不会中断整体检查', () => {
   const r = checkDocument(BAD);
-  assert.equal(r.summary.checked, 24);
+  assert.equal(r.summary.checked, 26);
   assert.ok(r.score.score >= 0);
 });
 

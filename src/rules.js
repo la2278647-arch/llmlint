@@ -1,13 +1,15 @@
 'use strict';
 
 // =====================================================================
-// llmlint 规则定义 — 24 条针对 LLM 生成文本的静态检查规则
+// llmlint 规则定义 — 26 条针对 LLM 生成文本的静态检查规则
 // =====================================================================
 
 import {
-  NL, lineCol, snippet, scan, maskCode, rule, RULES,
+  NL, lineCol, snippet, scan, maskCode, maskUrls, rule, RULES,
   PLACEHOLDER_RE, FILLER_RE, HEDGE_RE, OVERCLAIM_RE, SUPERLATIVE_RE,
-  VAGUE_TIME_RE, EMOJI_RE, CJK_LATIN_RE, CN_PUNCT_RE, HEADING_RE,
+  VAGUE_TIME_RE, EMOJI_RE, CJK_LATIN_RE, CN_PUNCT_RE, KANA_RE,
+  JA_HALF_PUNCT_RE, HANKAKU_KANA_RE, ZENKAKU_KANA_RE,
+  HEADING_RE,
   BARE_URL_RE, LIST_RE, EMPTY_LIST_RE, TABLE_RE, SENTENCE_RE,
   SHOUT_RE, PCT_RE, SHOUT_OK, FENCE_LINE_RE
 } from './engine.js';
@@ -452,6 +454,41 @@ rule({
       return [{ message: '文件末尾缺少换行符', line: lines.length, column: lines[lines.length - 1].length + 1, snippet: '' }];
     }
     return [];
+  }
+});
+
+// 25 — 日文内容使用半角标点
+// 只有包含假名的行才检查，纯英文或纯中文文档不会触发；
+// 一次只报一条，避免每篇日文文档刷出几十条重复提示。
+rule({
+  id: 'ja-halfwidth-punct', severity: 'info', description: '日文内容中使用半角标点',
+  check: function (text) {
+    const masked = maskUrls(maskCode(text));
+    let total = 0;
+    let first = null;
+    for (const m of scan(masked, JA_HALF_PUNCT_RE)) {
+      const ls = masked.lastIndexOf(NL, m.index) + 1;
+      const le = masked.indexOf(NL, m.index);
+      const line = masked.slice(ls, le === -1 ? masked.length : le);
+      if (!KANA_RE.test(line)) continue;
+      total++;
+      if (first === null) first = m;
+    }
+    if (first === null) return [];
+    return [hit(text, first, '日文内容中使用了半角标点（共 ' + total + ' 处），建议改用日文标点')];
+  }
+});
+
+// 26 — 半角片假名与全角混用
+// 通篇只用半角（技术文档的常见写法）不算问题，只在两种宽度混用时提示。
+rule({
+  id: 'ja-hankaku-kana', severity: 'info', description: '半角片假名与全角混用',
+  check: function (text) {
+    const masked = maskCode(text);
+    const half = scan(masked, HANKAKU_KANA_RE);
+    if (half.length === 0) return [];
+    if (!ZENKAKU_KANA_RE.test(masked)) return [];
+    return [hit(text, half[0], '半角片假名与全角片假名混用，建议统一为全角')];
   }
 });
 

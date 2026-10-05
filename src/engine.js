@@ -43,6 +43,12 @@ function maskCode(text) {
   return text.replace(FENCE_BLOCK_RE, blank).replace(INLINE_CODE_RE, blank);
 }
 
+// 屏蔽 URL：URL 里的 ?, . 等字符属于地址的一部分，不该被当成标点问题。
+const URL_MASK_RE = new RegExp('https?:\\/\\/[^\\s<>' + BT + ']*', 'g');
+function maskUrls(text) {
+  return text.replace(URL_MASK_RE, blank);
+}
+
 // ---------- 正则常量 ----------
 
 const PLACEHOLDER_RE = /\b(?:TODO|FIXME|TBD|XXX)\b|lorem\s*ipsum|\[\s*(?:待补充|TODO|TBD)\s*\]|待填写|\{\{[^}]+\}\}/gi;
@@ -54,6 +60,13 @@ const VAGUE_TIME_RE = /(上周|最近|近期|不久前|前几天|几天前|不�
 const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
 const CJK_LATIN_RE = /[\u4e00-\u9fff][A-Za-z0-9]|[A-Za-z0-9][\u4e00-\u9fff]/g;
 const CN_PUNCT_RE = /[，。！？：；]/g;
+// 日文：假名用于门控，只有出现假名的行才检查，纯英文行不受影响。
+const KANA_RE = /[\u3040-\u309F\u30A0-\u30FF]/;
+// 半角标点：逗号句号排除数字两侧（小数与千分位），句号再排除省略号。
+const JA_HALF_PUNCT_RE = /(?<!\d)[!?]|(?<!\d),(?!\d)|(?<!\d)(?<!\.)\.(?!\.)(?!\d)/g;
+// 半角片假名与全角片假名：只在两者同时出现时才算混用。
+const HANKAKU_KANA_RE = /[\uFF65\uFF66-\uFF9F\uFFE0]/g;
+const ZENKAKU_KANA_RE = /[\u30A0-\u30FF\u30FB]/;
 const HEADING_RE = /^[ \t]*#{1,6}[ \t]+(.+?)[ \t]*$/gm;
 const BARE_URL_RE = new RegExp('https?:\\/\\/[^\\s<>' + BT + '\\[\\]()""\' ]+', 'g');
 const LIST_RE = /^([ \t]*)(?:[-*+]|\d+\.)[ \t]+/gm;
@@ -69,4 +82,4 @@ const SHOUT_OK = new Set(['API','MCP','JSON','HTTP','HTTPS','HTML','CSS','README
 const RULES = [];
 function rule(def) { RULES.push(def); return def; }
 
-export { NL, BT, lineCol, snippet, scan, blank, maskCode, RULES, rule, PLACEHOLDER_RE, FILLER_RE, HEDGE_RE, OVERCLAIM_RE, SUPERLATIVE_RE, VAGUE_TIME_RE, EMOJI_RE, CJK_LATIN_RE, CN_PUNCT_RE, HEADING_RE, BARE_URL_RE, LIST_RE, EMPTY_LIST_RE, TABLE_RE, SENTENCE_RE, TRAILING_RE, SHOUT_RE, PCT_RE, SHOUT_OK, FENCE_LINE_RE };
+export { NL, BT, lineCol, snippet, scan, blank, maskCode, maskUrls, RULES, rule, PLACEHOLDER_RE, FILLER_RE, HEDGE_RE, OVERCLAIM_RE, SUPERLATIVE_RE, VAGUE_TIME_RE, EMOJI_RE, CJK_LATIN_RE, CN_PUNCT_RE, KANA_RE, JA_HALF_PUNCT_RE, HANKAKU_KANA_RE, ZENKAKU_KANA_RE, HEADING_RE, BARE_URL_RE, LIST_RE, EMPTY_LIST_RE, TABLE_RE, SENTENCE_RE, TRAILING_RE, SHOUT_RE, PCT_RE, SHOUT_OK, FENCE_LINE_RE };

@@ -1,6 +1,6 @@
 # llmlint [![release](https://img.shields.io/github/v/release/la2278647-arch/llmlint)](https://github.com/la2278647-arch/llmlint/releases) [![license](https://img.shields.io/github/license/la2278647-arch/llmlint)](LICENSE) [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/) [![deps](https://img.shields.io/badge/runtime%20deps-0-orange)](https://github.com/la2278647-arch/llmlint)
 
-**Health checks for text written by AI.** 24 rules, a 0-100 score, CLI plus MCP server. Zero dependencies, runs entirely on your machine.
+**Health checks for text written by AI.** 26 rules, a 0-100 score, CLI plus MCP server. Zero dependencies, runs entirely on your machine.
 
 - Docs: [中文](README.md) · [English](README.en.md)
 - License: MIT
@@ -25,7 +25,7 @@ llmlint closes that gap.
 
 ## Features
 
-- **24 rules** in Chinese and English, aimed at real LLM failure modes
+- **26 rules** in Chinese and English, aimed at real LLM failure modes
 - **0-100 score with A-F grades**, weighted by severity
 - **Precise locations**: every finding has line, column, and a source snippet
 - **Code is masked automatically**: rules never fire inside code blocks
@@ -59,7 +59,7 @@ llmlint — README.md
 
 评分    90/100  等级 A
 问题    5 条（error 0 / warning 2 / info 3）
-规则    24/24
+规则    26/26
 
 --- 问题明细 ---
 
@@ -82,7 +82,7 @@ Full rule list:
 llmlint rules
 ```
 
-## The 24 rules
+## The 26 rules
 
 | Rule | Severity | What it catches |
 | --- | --- | --- |
@@ -110,6 +110,8 @@ llmlint rules
 | `trailing-space` | info | Trailing whitespace |
 | `number-without-source` | info | Percentage claims without a source |
 | `no-final-newline` | info | Missing newline at end of file |
+| `ja-halfwidth-punct` | info | Half-width `,` `.` `!` `?` in Japanese prose |
+| `ja-hankaku-kana` | info | Mixed half-width and full-width katakana |
 
 ## Scoring
 
@@ -288,13 +290,19 @@ A pull-request gate usually wants incremental checking, so that only newly intro
 3. **False positives cost more than false negatives.** Code blocks, inline code, link syntax, and common acronyms are all masked or allow-listed.
 4. **Findings must be locatable.** Every finding carries a line, column, and snippet.
 5. **Rules are pluggable.** Adding a rule is one registration in `src/rules.js` plus one positive test case.
+6. **Language rules gate first.** The two Japanese rules only run on lines containing kana, so mixed Chinese / English / Japanese documents do not trip them. Code blocks, inline code, and URLs are masked before any rule runs.
+
+Trade-offs in the Japanese rules:
+
+- `ja-halfwidth-punct` skips decimals and thousands separators (digits on both sides) and ellipses. It reports at most one finding per file, so a Japanese document does not flood the output.
+- `ja-hankaku-kana` fires only when half-width and full-width katakana appear together. A document that uses half-width katakana throughout is not flagged; that is a common style in technical writing.
 
 ## Project layout
 
 ```text
 src/
   engine.js      line/column math, code masking, regex constants, rule registry
-  rules.js       the 24 rule implementations
+  rules.js       the 26 rule implementations
   score.js       scoring and grading
   fix.js         the three mechanically fixable rules
   config.js      config discovery, glob scoping and option merge
@@ -304,15 +312,16 @@ src/
   mcp/server.js  MCP server
 
 test/
-  rules.test.js  rules and scoring (39)
-  fix.test.js    autofix (26)
-  config.test.js config and precedence (41)
-  diff.test.js   incremental checking (26)
-  mcp.test.js    protocol (9)
+  rules.test.js      rules and scoring (57)
+  cli-format.test.js output formats and error paths (9)
+  fix.test.js        autofix (26)
+  config.test.js     config and precedence (43)
+  diff.test.js       incremental checking (27)
+  mcp.test.js        protocol (10)
 
 examples/
   demo-good.md   clean document, zero findings
-  demo-bad.md    all 24 rules fire
+  demo-bad.md    14 rules, 25 findings
   fix-target.md  before and after autofix
 ```
 

@@ -63,7 +63,7 @@ test('CLI --format md 配合 --fix 追加修复说明', () => {
 test('CLI rules 命令列出全部规则与严重度', () => {
   const r = run(['rules']);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /24 条/);
+  assert.match(r.stdout, /26 条/);
   assert.match(r.stdout, /\| `placeholder-text` \| error \|/);
   assert.match(r.stdout, /\| `no-final-newline` \| info \|/);
   assert.match(r.stdout, /\| `unbalanced-markdown` \| error \|/);

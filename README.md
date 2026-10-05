@@ -1,6 +1,6 @@
 # llmlint [![release](https://img.shields.io/github/v/release/la2278647-arch/llmlint)](https://github.com/la2278647-arch/llmlint/releases) [![license](https://img.shields.io/github/license/la2278647-arch/llmlint)](LICENSE) [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/) [![deps](https://img.shields.io/badge/runtime%20deps-0-orange)](https://github.com/la2278647-arch/llmlint)
 
-**给 AI 写的文本做体检。** 24 条规则、0-100 评分、CLI + MCP server，零依赖、纯本地运行。
+**给 AI 写的文本做体检。** 26 条规则、0-100 评分、CLI + MCP server，零依赖、纯本地运行。
 
 - 语言：[README](README.md) · [English](README.en.md)
 - 许可：MIT
@@ -25,7 +25,7 @@ llmlint 就是补这个洞的。
 
 ## 特性
 
-- **24 条规则**，中英双语，针对 LLM 输出的真实失败模式
+- **26 条规则**，中英双语，针对 LLM 输出的真实失败模式
 - **0-100 评分 + A-F 等级**，按严重度加权扣分
 - **精确到行列**，每条发现带行号、列号、原文片段，可直接跳转
 - **代码块自动屏蔽**，规则不会在代码里误报
@@ -61,7 +61,7 @@ llmlint — README.md
 
 评分    90/100  等级 A
 问题    5 条（error 0 / warning 2 / info 3）
-规则    24/24
+规则    26/26
 
 --- 问题明细 ---
 
@@ -84,7 +84,7 @@ llmlint score README.md
 llmlint rules
 ```
 
-## 24 条规则
+## 26 条规则
 
 | 规则 | 严重度 | 检查什么 |
 | --- | --- | --- |
@@ -112,6 +112,8 @@ llmlint rules
 | `trailing-space` | info | 行尾多余空格 |
 | `number-without-source` | info | 百分比数字断言没给来源 |
 | `no-final-newline` | info | 文件末尾缺换行 |
+| `ja-halfwidth-punct` | info | 日文内容里用半角 `,` `.` `!` `?` |
+| `ja-hankaku-kana` | info | 半角片假名与全角片假名混用 |
 
 ## 评分
 
@@ -219,7 +221,7 @@ llmlint diff — docs/a.md
 
 评分    98/100  等级 A
 新增    1 条   遗留 1 条（不扣分）
-规则    24/24
+规则    26/26
 ```
 
 改动范围取自 `git diff --unified=0` 的分段头，纯删除的分段不产生范围，新增文件整份都算新增。未跟踪但未被忽略的文件也会检查，命中 `.gitignore` 的一律跳过。
@@ -289,13 +291,16 @@ PR 门禁更适合用增量检查，只拦新引入的问题，历史遗留不�
 3. **误报比漏报更贵**。规则里对代码块、行内代码、链接语法、常见缩写都做了屏蔽和白名单。
 4. **发现必须可定位**。每条问题都有行号列号和原文片段。
 5. **规则可插拔**。加一条规则只需在 `src/rules.js` 里注册，并在测试里补一个正向用例。
+6. **语言规则先做门控**。日文两条规则只在行内出现假名时才检查，中日英混排的文档不会被误报；代码块、行内代码、URL 一律先屏蔽。
+
+日文两条规则的取舍：`ja-halfwidth-punct` 排除数字两侧的小数点与千分位逗号、排除省略号，一次只报一条，避免每篇日文文档刷出几十条重复提示。`ja-hankaku-kana` 只在半角与全角片假名同时出现时报，通篇只用半角（技术文档常见写法）不算问题。
 
 ## 项目结构
 
 ```text
 src/
   engine.js      行号换算、代码屏蔽、正则常量、规则注册表
-  rules.js       24 条规则实现
+  rules.js       26 条规则实现
   score.js       评分与等级
   fix.js         可机械修复的三条规则
   config.js      配置发现、glob 分区与选项合并
@@ -304,14 +309,15 @@ src/
   cli.js         命令行
   mcp/server.js  MCP 服务端
 test/
-  rules.test.js  规则与评分（39）
-  fix.test.js    自动修复（26）
-  config.test.js 配置与优先级（41）
-  diff.test.js   增量检查（26）
-  mcp.test.js    协议（9）
+  rules.test.js      规则与评分（57）
+  cli-format.test.js 输出格式与错误路径（9）
+  fix.test.js        自动修复（26）
+  config.test.js     配置与优先级（43）
+  diff.test.js       增量检查（27）
+  mcp.test.js        协议（10）
 examples/
   demo-good.md   零发现的干净文档
-  demo-bad.md    24 条问题全触发
+  demo-bad.md    14 条规则、25 条发现
   fix-target.md  修复前后的对照
 ```
 
