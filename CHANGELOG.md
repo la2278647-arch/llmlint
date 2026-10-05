@@ -2,6 +2,30 @@
 
 本项目遵循语义化版本与 Keep a Changelog。
 
+## [0.4.0] - 2026-10-05
+
+### 新增
+
+**增量检查 `llmlint diff`**
+
+- 新增 `diff` 命令：跑完整检查，再按 git 的改动行范围把发现拆成新增与遗留两组
+- 只有新增问题扣分并决定退出码，遗留问题只在报告里给数量
+- 不指定文件时自动检查变更过的文件与新增的未跟踪文件，命中 `.gitignore` 的一律跳过
+- `--base <ref>` 指定对比基准，默认 `HEAD`
+- text / md / json 三种输出，json 里 `added` 与 `existing` 分开
+- 库入口新增 `changedRanges` / `splitFindings` / `changedFiles` / `untrackedFiles` / `DiffError`，`./diff` 子路径同样可用
+
+**CI 模板**
+
+- `examples/github-actions.yml` 增加增量检查步骤，验证新增问题会让流水线失败
+
+### 变更
+
+- 格式化输出改为复用同一套发现渲染与表格 helper，去掉 `check` 与 `diff` 之间的重复
+- `diff` 不支持 `--fix`：修复会改写历史行，新增与遗留的划分就不成立了
+- `diff` 不支持标准输入：读不到对比版本
+- 测试套件从 115 项扩到 141 项
+
 ## [0.3.0] - 2026-10-05
 
 ### 新增

@@ -204,6 +204,28 @@ llmlint check --config l.json # 指定配置文件
 llmlint check --no-config f.md # 跳过查找
 ```
 
+## 增量检查
+
+只关心「这次改动引入了什么新问题」。`diff` 跑完整检查，再按 git 的改动行范围把发现拆成两组：新增问题扣分并决定退出码，遗留问题只在报告里给数量。
+
+```bash
+llmlint diff                       # 自动检查变更文件与新增的未跟踪文件
+llmlint diff docs/a.md             # 只看指定文件
+llmlint diff --base origin/main    # 指定对比基准
+```
+
+```text
+llmlint diff — docs/a.md
+
+评分    98/100  等级 A
+新增    1 条   遗留 1 条（不扣分）
+规则    24/24
+```
+
+改动范围取自 `git diff --unified=0` 的分段头，纯删除的分段不产生范围，新增文件整份都算新增。未跟踪但未被忽略的文件也会检查，命中 `.gitignore` 的一律跳过。
+
+`diff` 复用配置文件与命令行参数，所以按路径分区的规则集、`severity` 覆盖和 `--fail-on` 都照样生效。不支持 `--fix`：修复会改写历史行，新增与遗留的划分就不成立了。
+
 ## 作为库使用
 
 ```js
@@ -254,6 +276,12 @@ console.log(fixed.text);
 
 退出码：0 = 干净，1 = 达到 `--fail-on` 阈值，2 = 有 error。
 
+PR 门禁更适合用增量检查，只拦新引入的问题，历史遗留不阻塞合并：
+
+```yaml
+- run: node src/cli.js diff --base origin/main --fail-on warning
+```
+
 ## 设计原则
 
 1. **零依赖**。不用官方 MCP SDK，不引依赖。安装体积接近零，供应链攻击面为零。
@@ -269,25 +297,33 @@ src/
   engine.js      行号换算、代码屏蔽、正则常量、规则注册表
   rules.js       24 条规则实现
   score.js       评分与等级
+  fix.js         可机械修复的三条规则
+  config.js      配置发现、glob 分区与选项合并
+  diff.js        改动行范围解析与新增遗留拆分
   index.js       checkDocument() 入口
   cli.js         命令行
   mcp/server.js  MCP 服务端
 test/
-  rules.test.js  规则与评分测试（39 个）
-  mcp.test.js    MCP 协议测试（9 个）
+  rules.test.js  规则与评分（39）
+  fix.test.js    自动修复（26）
+  config.test.js 配置与优先级（41）
+  diff.test.js   增量检查（26）
+  mcp.test.js    协议（9）
 examples/
   demo-good.md   零发现的干净文档
   demo-bad.md    24 条问题全触发
+  fix-target.md  修复前后的对照
 ```
 
 ## 路线图
 
-- [ ] 自动修复（`--fix`）：行尾空格、中英文空格、文件末尾换行
-- [ ] 自定义规则配置文件（`.llmlintrc`）
-- [ ] 增量检查：只检查变更的行
+- [x] 自动修复（`--fix`）：行尾空格、中英文空格、文件末尾换行
+- [x] 项目级配置文件（`llmlint.json` / `.llmlintrc.json`）
+- [x] 增量检查（`diff`）：只拦新引入的问题
 - [ ] 更多语言支持（日文、韩文、法文）
-- [ ] 规则插件机制
-- [ ] 与 GitHub Actions 集成的 scorecard 格式输出
+- [ ] 阈值调优指南
+- [ ] 容器化：交付前必须先在 CI 里实际构建并校验
+- [ ] GitHub Pages 示例站
 
 ## 参与
 

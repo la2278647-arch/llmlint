@@ -46,3 +46,18 @@ jobs:
         if: matrix.node-version == '22.x'
         run: |
           npm pack --dry-run | tail -25
+
+      - name: 增量检查：新增问题应非零退出
+        run: |
+          git config user.email ci@example.com
+          git config user.name ci
+          git add -A
+          git commit -q -m base
+          echo '# 新文档' > new-doc.md
+          echo 'TODO: 待补充。' >> new-doc.md
+          set +e
+          node src/cli.js diff --enable placeholder-text new-doc.md > /dev/null
+          code=$?
+          set -e
+          echo "exit=$code"
+          test $code -eq 2

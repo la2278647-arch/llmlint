@@ -202,6 +202,31 @@ llmlint check --config l.json # explicit config file
 llmlint check --no-config f.md # skip discovery
 ```
 
+## Incremental checking
+
+Only "what did this change introduce?" matters in a pull request. `diff` runs the full check, then splits findings by git's changed line ranges: new findings deduct and drive the exit code, pre-existing ones are only counted.
+
+```bash
+llmlint diff                       # changed and new untracked files
+llmlint diff docs/a.md             # a specific file
+llmlint diff --base origin/main    # explicit base ref
+```
+
+```json
+{
+  "file": "docs/a.md",
+  "base": "HEAD",
+  "newFile": false,
+  "score": { "score": 98, "grade": "A", "penalty": 2 },
+  "added": [{ "rule": "trailing-space", "line": 5 }],
+  "existing": [{ "rule": "cjk-spacing", "line": 3 }]
+}
+```
+
+Changed ranges come from `git diff --unified=0` hunk headers. Hunks that only delete lines produce no range, and a new file counts entirely as new. Untracked files that are not ignored are checked too; anything matched by `.gitignore` is skipped.
+
+`diff` reuses the config file and the command line flags, so path-scoped rule sets, `severity` overrides and `--fail-on` all apply as usual. `--fix` is not supported: fixing rewrites historical lines, which breaks the new-versus-existing split.
+
 ## As a library
 
 ```js
@@ -250,6 +275,12 @@ The full workflow lives in `examples/github-actions.yml`; copy it to `.github/wo
 
 Exit codes: 0 = clean, 1 = hit the `--fail-on` threshold, 2 = error present.
 
+A pull-request gate usually wants incremental checking, so that only newly introduced problems block the merge:
+
+```yaml
+- run: node src/cli.js diff --base origin/main --fail-on warning
+```
+
 ## Design principles
 
 1. **Zero dependencies.** No MCP SDK, no lint rule packs. Install size is near zero, supply-chain attack surface is zero.
@@ -265,27 +296,35 @@ src/
   engine.js      line/column math, code masking, regex constants, rule registry
   rules.js       the 24 rule implementations
   score.js       scoring and grading
+  fix.js         the three mechanically fixable rules
+  config.js      config discovery, glob scoping and option merge
+  diff.js        changed-range parsing and new-versus-existing split
   index.js       checkDocument() entry point
   cli.js         command line interface
   mcp/server.js  MCP server
 
 test/
-  rules.test.js  rule and scoring tests (39)
-  mcp.test.js    MCP protocol tests (9)
+  rules.test.js  rules and scoring (39)
+  fix.test.js    autofix (26)
+  config.test.js config and precedence (41)
+  diff.test.js   incremental checking (26)
+  mcp.test.js    protocol (9)
 
 examples/
   demo-good.md   clean document, zero findings
   demo-bad.md    all 24 rules fire
+  fix-target.md  before and after autofix
 ```
 
 ## Roadmap
 
-- [ ] `--fix` autofix for trailing whitespace, CJK spacing, final newline
-- [ ] `.llmlintrc` config file for custom rule sets
-- [ ] Incremental checking of changed lines only
+- [x] `--fix` autofix for trailing whitespace, CJK spacing, final newline
+- [x] Project config files (`llmlint.json` / `.llmlintrc.json`)
+- [x] Incremental checking (`diff`): only newly introduced problems
 - [ ] More languages (Japanese, Korean, French)
-- [ ] Plugin API for user rules
-- [ ] GitHub Actions scorecard output format
+- [ ] A guide to tuning thresholds
+- [ ] Container support: must be built and verified in CI before shipping
+- [ ] A GitHub Pages example site
 
 ## Contributing
 
