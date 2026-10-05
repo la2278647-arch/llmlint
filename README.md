@@ -345,12 +345,12 @@ src/
   cli.js         命令行
   mcp/server.js  MCP 服务端
 test/
-  rules.test.js      规则与评分（57）
+  rules.test.js      规则与评分（63）
   cli-format.test.js 输出格式与错误路径（9）
   fix.test.js        自动修复（26）
   config.test.js     配置与优先级（43）
   diff.test.js       增量检查（27）
-  mcp.test.js        协议（10）
+  mcp.test.js        协议（23）
 examples/
   demo-good.md   零发现的干净文档
   demo-ja.md     零发现的日文文档

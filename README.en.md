@@ -351,12 +351,12 @@ src/
   mcp/server.js  MCP server
 
 test/
-  rules.test.js      rules and scoring (57)
+  rules.test.js      rules and scoring (63)
   cli-format.test.js output formats and error paths (9)
   fix.test.js        autofix (26)
   config.test.js     config and precedence (43)
   diff.test.js       incremental checking (27)
-  mcp.test.js        protocol (10)
+  mcp.test.js        protocol (23)
 
 examples/
   demo-good.md   clean document, zero findings

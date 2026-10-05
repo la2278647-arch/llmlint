@@ -30,6 +30,34 @@ function rpc(messages) {
   });
 }
 
+/** 发送原始行，用于坏 JSON、空行这类无法 JSON.stringify 的输入 */
+function raw(lines) {
+  return new Promise(function (resolve, reject) {
+    const child = spawn(process.execPath, [serverPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', function (d) { out += d; });
+    child.on('error', reject);
+    child.on('close', function () {
+      resolve(out.split(NL).filter(function (l) { return l.trim() !== ''; }));
+    });
+    for (const l of lines) child.stdin.write(l + NL);
+    child.stdin.end();
+  });
+}
+
+test('坏 JSON、空行与非对象输入被静默忽略', async () => {
+  const lines = await raw([
+    '{not json',
+    '',
+    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    '"just a string"',
+    '42'
+  ]);
+  assert.equal(lines.length, 1);
+  assert.ok(Array.isArray(JSON.parse(lines[0]).result.tools));
+});
+
 test('initialize 返回服务信息与工具能力', async () => {
   const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05' } }]);
   assert.equal(r.lines.length, 1);
@@ -173,6 +201,41 @@ test('未知工具返回 isError 并说明工具名', async () => {
   const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'frobnicate', arguments: {} } }]);
   assert.equal(r.lines[0].result.isError, true);
   assert.match(JSON.parse(r.lines[0].result.content[0].text).error, /未知工具: frobnicate/);
+});
+
+test('ping 返回空结果', async () => {
+  const r = await rpc([{ jsonrpc: '2.0', id: 1, method: 'ping' }]);
+  assert.equal(r.lines.length, 1);
+  assert.deepEqual(r.lines[0].result, {});
+});
+
+test('initialized 是通知，不回响应', async () => {
+  const r = await rpc([{ jsonrpc: '2.0', method: 'initialized' }]);
+  assert.equal(r.lines.length, 0);
+});
+
+test('没有 id 的未知方法不回响应', async () => {
+  const r = await rpc([{ jsonrpc: '2.0', method: 'no/such' }]);
+  assert.equal(r.lines.length, 0);
+});
+
+test('同一连接上 id 与通知混排互不影响', async () => {
+  const r = await rpc([
+    { jsonrpc: '2.0', method: 'initialized' },
+    { jsonrpc: '2.0', id: 7, method: 'tools/list' },
+    { jsonrpc: '2.0', id: 8, method: 'ping' }
+  ]);
+  assert.equal(r.lines.length, 2);
+  assert.deepEqual(r.lines.map(function (l) { return l.id; }), [7, 8]);
+});
+
+test('没有 params 的方法调用仍能跑', async () => {
+  const r = await rpc([
+    { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_rules' } },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { arguments: {} } }
+  ]);
+  assert.equal(r.lines[0].result.isError, false);
+  assert.equal(r.lines[1].result.isError, true);
 });
 
 test('未知方法返回 -32601', async () => {
