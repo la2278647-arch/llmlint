@@ -31,7 +31,7 @@ llmlint 就是补这个洞的。
 - **代码块自动屏蔽**，规则不会在代码里误报
 - **CLI 四种命令**，text / md / json 三种输出
 - **CI 友好退出码**，有 error 返回 2
-- **MCP server**，3 个工具，手写 stdio JSON-RPC，不用官方 SDK
+- **MCP server**，5 个工具含自动修复，手写 stdio JSON-RPC，不用官方 SDK
 - **零依赖、纯本地**，文本不出机器
 
 ## 安装
@@ -273,13 +273,33 @@ console.log(fixed.text);
 }
 ```
 
-三个工具：
+五个工具：
 
 | 工具 | 作用 |
 | --- | --- |
 | `lint_document` | 检查一段文本，返回评分与问题清单 |
 | `lint_file` | 检查本地文件 |
 | `list_rules` | 列出全部规则与严重度 |
+| `fix_document` | 自动修复文本，返回修复后的内容 |
+| `fix_file` | 自动修复本地文件并返回内容，不写回文件 |
+
+`fix_document` 一次回给调用方四样东西：修了哪些规则、修复前后的分数、还剩什么问题、哪些规则可自动修：
+
+``` json
+{
+  "changed": true,
+  "text": "这是一段中文 English 混排。\n",
+  "changes": [{"rule": "cjk-spacing", "count": 2}],
+  "scoreBefore": {"score": 94, "grade": "A"},
+  "scoreAfter": {"score": 100, "grade": "A"},
+  "remaining": [],
+  "fixable": ["trailing-space", "cjk-spacing", "no-final-newline"]
+}
+```
+
+分数对象里另外还有 `counts`（各严重度条数）与 `penalty`（总扣分）。
+
+可自动修复的只有行尾空格、中英文空格、末尾换行三条，其余问题需要人工判断，会留在 `remaining` 里。LLM 写完一段文本，一次调用就能拿到分数、能自动修的部分、以及剩下的问题。
 
 ## CI 集成
 

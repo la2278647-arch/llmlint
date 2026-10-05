@@ -8,7 +8,7 @@
 // =====================================================================
 
 import { readFileSync } from 'node:fs';
-import { checkDocument, RULES } from '../index.js';
+import { checkDocument, RULES, fixDocument, FIXABLE } from '../index.js';
 
 const NL = String.fromCharCode(10);
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
@@ -17,6 +17,18 @@ const SEVERITY = {
   type: 'string',
   enum: ['info', 'warning', 'error'],
   description: '最低报告级别，默认 info'
+};
+
+const RULE_IDS = {
+  type: 'array',
+  items: { type: 'string' },
+  description: '规则 id 列表，取自 list_rules'
+};
+
+const MAX_FINDINGS = {
+  type: 'integer',
+  minimum: 0,
+  description: '最多返回多少条问题；只影响返回数量，不影响评分'
 };
 
 const TOOLS = [
@@ -28,8 +40,9 @@ const TOOLS = [
       properties: {
         text: { type: 'string', description: '待检查的文本内容' },
         minSeverity: SEVERITY,
-        disable: { type: 'array', items: { type: 'string' }, description: '要跳过的规则 id' },
-        maxFindings: { type: 'integer', minimum: 0, description: '最多返回多少条问题' }
+        enable: RULE_IDS,
+        disable: RULE_IDS,
+        maxFindings: MAX_FINDINGS
       },
       required: ['text']
     }
@@ -41,7 +54,40 @@ const TOOLS = [
       type: 'object',
       properties: {
         path: { type: 'string', description: '文件路径' },
-        minSeverity: SEVERITY
+        minSeverity: SEVERITY,
+        enable: RULE_IDS,
+        disable: RULE_IDS,
+        maxFindings: MAX_FINDINGS
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'fix_document',
+    description: '自动修复一段 Markdown 文本并返回修复后的文本。只修可机械修复的规则，剩下的问题列在 remaining 里',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: '待修复的文本内容' },
+        minSeverity: SEVERITY,
+        enable: RULE_IDS,
+        disable: RULE_IDS,
+        maxFindings: MAX_FINDINGS
+      },
+      required: ['text']
+    }
+  },
+  {
+    name: 'fix_file',
+    description: '自动修复一个本地 Markdown 文件并返回修复后的文本，不会写回文件',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: '文件路径' },
+        minSeverity: SEVERITY,
+        enable: RULE_IDS,
+        disable: RULE_IDS,
+        maxFindings: MAX_FINDINGS
       },
       required: ['path']
     }
@@ -52,6 +98,35 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {} }
   }
 ];
+
+// lint_document 与 lint_file 共用同一个选项映射，
+// 避免一个工具接住某个参数、另一个偷偷忽略。
+function lintText(text, args) {
+  const result = checkDocument(text, {
+    minSeverity: args.minSeverity,
+    enable: args.enable,
+    disable: args.disable,
+    maxFindings: args.maxFindings
+  });
+  return { score: result.score, findings: result.findings, summary: result.summary };
+}
+
+// 跑一遍修复，再跑一遍检查，把「修了什么」和「还剩什么」都还给调用方。
+function fixText(text, args) {
+  const opts = { minSeverity: args.minSeverity, enable: args.enable, disable: args.disable };
+  const before = checkDocument(text, opts);
+  const fixed = fixDocument(text, opts);
+  const after = checkDocument(fixed.text, Object.assign({}, opts, { maxFindings: args.maxFindings }));
+  return {
+    changed: fixed.text !== text,
+    text: fixed.text,
+    changes: fixed.fixes,
+    scoreBefore: before.score,
+    scoreAfter: after.score,
+    remaining: after.findings,
+    fixable: FIXABLE.slice()
+  };
+}
 
 function runTool(name, args) {
   args = args || {};
@@ -65,17 +140,22 @@ function runTool(name, args) {
     let text;
     try { text = readFileSync(args.path, 'utf8'); }
     catch (e) { return { error: '读取文件失败: ' + e.message }; }
-    const result = checkDocument(text, { minSeverity: args.minSeverity, disable: args.disable });
-    return { file: args.path, score: result.score, findings: result.findings };
+    return Object.assign({ file: args.path }, lintText(text, args));
+  }
+  if (name === 'fix_document') {
+    if (typeof args.text !== 'string') return { error: 'text 必须是字符串' };
+    return fixText(args.text, args);
+  }
+  if (name === 'fix_file') {
+    if (typeof args.path !== 'string') return { error: 'path 必须是字符串' };
+    let text;
+    try { text = readFileSync(args.path, 'utf8'); }
+    catch (e) { return { error: '读取文件失败: ' + e.message }; }
+    return Object.assign({ file: args.path }, fixText(text, args));
   }
   if (name === 'lint_document') {
     if (typeof args.text !== 'string') return { error: 'text 必须是字符串' };
-    const result = checkDocument(args.text, {
-      minSeverity: args.minSeverity,
-      disable: args.disable,
-      maxFindings: args.maxFindings
-    });
-    return { score: result.score, findings: result.findings, summary: result.summary };
+    return lintText(args.text, args);
   }
   return { error: '未知工具: ' + name };
 }
@@ -97,7 +177,7 @@ function handleMessage(msg) {
         protocolVersion: params.protocolVersion || '2024-11-05',
         serverInfo: { name: 'llmlint', version: pkg.version },
         capabilities: { tools: {} },
-        instructions: 'llmlint 检查 Markdown 文本质量：' + RULES.length + ' 条规则、0-100 评分。'
+        instructions: 'llmlint 检查 Markdown 文本质量：' + RULES.length + ' 条规则、0-100 评分。fix_document 与 fix_file 可自动修复行尾空格、中英文空格与末尾换行。'
       }
     });
     return;

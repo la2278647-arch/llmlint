@@ -274,7 +274,15 @@ test('minSeverity 过滤低级别', () => {
 
 test('maxFindings 限制返回数量', () => {
   const r = checkDocument(BAD, { maxFindings: 3 });
-  assert.ok(r.findings.length <= 3);
+  assert.equal(r.findings.length, 3);
+});
+
+test('maxFindings 只截断返回数量，不影响评分', () => {
+  const full = checkDocument(BAD);
+  const capped = checkDocument(BAD, { maxFindings: 1 });
+  assert.equal(capped.findings.length, 1);
+  assert.equal(capped.score.score, full.score.score);
+  assert.equal(capped.score.score, 0, '被截掉的发现仍然要扣分');
 });
 
 test('发现按行号列号升序排列', () => {

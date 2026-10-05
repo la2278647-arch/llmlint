@@ -12,7 +12,7 @@ import { fixDocument, FIXABLE } from './fix.js';
  * @param {string[]} [options.enable]   只运行这些规则
  * @param {string[]} [options.disable]  跳过这些规则
  * @param {string}   [options.minSeverity] info | warning | error
- * @param {number}   [options.maxFindings]  最多返回多少条发现
+ * @param {number}   [options.maxFindings]  最多返回多少条发现；只影响返回数量，不影响评分
  * @param {object}   [options.severity]     规则 id 到严重度的覆盖映射
  */
 export function checkDocument(text, options) {
@@ -22,7 +22,7 @@ export function checkDocument(text, options) {
   const sevMap = opts.severity || {};
   const threshold = severityOrder(opts.minSeverity || 'info');
   const max = opts.maxFindings || 0;
-  const findings = [];
+  const all = [];
   const stats = {};
 
   for (const ruleDef of RULES) {
@@ -38,8 +38,7 @@ export function checkDocument(text, options) {
     stats[ruleDef.id] = results.length;
 
     for (const finding of results) {
-      if (max > 0 && findings.length >= max) break;
-      findings.push({
+      all.push({
         rule: ruleDef.id,
         severity: severity,
         message: finding.message,
@@ -50,12 +49,15 @@ export function checkDocument(text, options) {
     }
   }
 
-  findings.sort(function (a, b) { return (a.line - b.line) || (a.column - b.column); });
+  all.sort(function (a, b) { return (a.line - b.line) || (a.column - b.column); });
+  // maxFindings 只截断返回给调用方的数量；评分按全部发现算，
+  // 否则一份问题很多的文档会因为只报了前几条而拿到虚高的分数。
+  const findings = max > 0 ? all.slice(0, max) : all;
   const checked = Object.keys(stats).filter(function (k) { return stats[k] !== 'skipped'; }).length;
 
   return {
     findings: findings,
-    score: scoreFindings(findings),
+    score: scoreFindings(all),
     stats: stats,
     summary: { rules: RULES.length, checked: checked }
   };

@@ -31,7 +31,7 @@ llmlint closes that gap.
 - **Code is masked automatically**: rules never fire inside code blocks
 - **CLI** with four commands and text / md / json output
 - **CI-friendly exit codes**: 2 on error
-- **MCP server** with three tools, hand-written stdio JSON-RPC, no SDK
+- **MCP server** with five tools including auto-fix, hand-written stdio JSON-RPC, no SDK
 - **Zero dependencies, fully local**: your text never leaves the machine
 
 ## Install
@@ -282,6 +282,26 @@ For Claude Code, Cursor, and other MCP clients. Hand-written stdio JSON-RPC 2.0,
 | `lint_document` | Lint a text string, return score and findings |
 | `lint_file` | Lint a local file |
 | `list_rules` | List all rules and severities |
+| `fix_document` | Auto-fix a text string and return the fixed text |
+| `fix_file` | Auto-fix a local file and return the fixed text, without writing it back |
+
+`fix_document` returns four things at once: what was changed, the score before and after, what remains, and which rules are fixable at all:
+
+``` json
+{
+  "changed": true,
+  "text": "A paragraph with Chinese English mixed.\n",
+  "changes": [{"rule": "cjk-spacing", "count": 2}],
+  "scoreBefore": {"score": 94, "grade": "A"},
+  "scoreAfter": {"score": 100, "grade": "A"},
+  "remaining": [],
+  "fixable": ["trailing-space", "cjk-spacing", "no-final-newline"]
+}
+```
+
+Score objects also carry `counts` (findings per severity) and `penalty` (total deduction).
+
+Only trailing whitespace, CJK spacing, and the final newline can be fixed mechanically. Everything else needs judgement, so it stays in `remaining`.
 
 ## CI
 
