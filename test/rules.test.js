@@ -107,6 +107,54 @@ test('英文链接内的裸 URL 不触发', () => {
   assert.equal(of(r.findings, 'bare-url').length, 0);
 });
 
+test('unbalanced-markdown: 未闭合的内联代码、删除线、链接都会报', () => {
+  const cases = [
+    ['内联代码', '行内 ' + BT + 'broken 不闭合。' + NL, /内联代码标记/],
+    ['删除线', '删除线 ~~abc 没闭合。' + NL, /删除线标记/],
+    ['中括号', '参考 [文档 没闭合。' + NL, /中括号未配对/],
+    ['链接目标', '参考 [文档](http://example.com 的地址。' + NL, /链接目标括号未闭合/]
+  ];
+  for (const one of cases) {
+    const r = checkDocument(one[1], { enable: ['unbalanced-markdown'] });
+    assert.ok(r.findings.length > 0, one[0]);
+    assert.ok(r.findings.some(f => one[2].test(f.message)), one[0] + '；实际: ' + r.findings.map(f => f.message).join(' | '));
+  }
+});
+
+test('unbalanced-markdown: 双反引号包单反引号不误报', () => {
+  const t = '这样写 ' + BT.repeat(2) + 'code with ' + BT + ' inside' + BT.repeat(2) + ' 是对的。' + NL;
+  const r = checkDocument(t, { enable: ['unbalanced-markdown'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('unbalanced-markdown: 未闭合围栏单独识别', () => {
+  const r = checkDocument(BT.repeat(3) + 'bash' + NL + 'echo hi' + NL, { enable: ['unbalanced-markdown'] });
+  assert.ok(r.findings.some(f => /围栏代码块/.test(f.message)), r.findings.map(f => f.message).join());
+});
+
+test('unbalanced-markdown: 成对的标记与链接不误报', () => {
+  const t = '# 标题' + NL + NL
+    + '粗体 **重点** 与删除线 ~~旧的~~。' + NL
+    + '内联 ' + BT + 'x' + BT + ' 与链接 [文档](https://example.com)。' + NL
+    + '还有括号说明 (补充说明)。' + NL;
+  const r = checkDocument(t, { enable: ['unbalanced-markdown'] });
+  assert.equal(r.findings.length, 0);
+});
+
+test('unbalanced-markdown: 定位到具体标记的行号列号', () => {
+  const r = checkDocument('第一行正常。' + NL + '第二行 ' + BT + 'broken。' + NL);
+  const f = of(r.findings, 'unbalanced-markdown')[0];
+  assert.equal(f.line, 2);
+  assert.ok(f.column >= 5);
+});
+
+test('demo-bad 基线锁定：25 条发现、评分 0、等级 F', () => {
+  const r = checkDocument(BAD);
+  assert.equal(r.findings.length, 25);
+  assert.equal(r.score.score, 0);
+  assert.equal(r.score.grade, 'F');
+});
+
 test('enable 只运行指定规则', () => {
   const r = checkDocument('TODO' + NL, { enable: ['placeholder-text'] });
   assert.equal(r.findings.length, 1);

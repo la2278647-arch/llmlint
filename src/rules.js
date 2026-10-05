@@ -324,16 +324,63 @@ rule({
 });
 
 // 20 — Markdown 标记未闭合
+// 覆盖四类：粗体 **、删除线 ~~、内联代码与围栏的反引号 run、链接的方括号
 rule({
   id: 'unbalanced-markdown', severity: 'error', description: 'Markdown 标记未闭合',
   check: function (text) {
     const out = [];
     const masked = maskCode(text);
-    const stars = (masked.match(/[*][*]/g) || []).length;
-    if (stars % 2 === 1) {
-      const idx = masked.lastIndexOf('**');
-      out.push(hit(text, { index: idx }, '未闭合的粗体标记 **'));
+
+    // 粗体与删除线：出现次数为奇数即未闭合
+    for (const one of [['**', /[*][*]/g, '粗体标记'], ['~~', /~~/g, '删除线标记']]) {
+      let n = 0;
+      let last = -1;
+      for (const m of scan(masked, one[1])) { n++; last = m.index; }
+      if (n % 2 === 1 && last >= 0) out.push(hit(text, { index: last }, '未闭合的' + one[2] + ' ' + one[0]));
     }
+
+    // 内联代码与围栏：按反引号 run 配对，闭合 run 长度必须不小于开 run
+    let open = null;
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) !== 96) continue;
+      let j = i;
+      let len = 0;
+      while (j < text.length && text.charCodeAt(j) === 96) { len++; j++; }
+      if (open === null) open = { start: i, len: len };
+      else if (len >= open.len) open = null;
+      i = j - 1;
+    }
+    if (open !== null) {
+      const bar = String.fromCharCode(96).repeat(open.len);
+      out.push(hit(text, { index: open.start }, '未闭合的' + (open.len >= 3 ? '围栏代码块' : '内联代码标记') + ' ' + bar));
+    }
+
+    // 链接：方括号必须成对；] 紧跟 ( 时该行内的圆括号也必须成对
+    let ob = 0;
+    let cb = 0;
+    let first = -1;
+    for (let i = 0; i < masked.length; i++) {
+      const ch = masked[i];
+      if (ch === '[') {
+        ob++;
+        if (first < 0) first = i;
+      } else if (ch === ']') {
+        cb++;
+        if (masked[i + 1] === '(') {
+          const end = masked.indexOf(NL, i);
+          const seg = masked.slice(i + 1, end === -1 ? masked.length : end);
+          let o = 0;
+          let c = 0;
+          for (let k = 0; k < seg.length; k++) {
+            if (seg[k] === '(') o++;
+            else if (seg[k] === ')') c++;
+          }
+          if (o > c) out.push(hit(text, { index: i }, '链接目标括号未闭合：' + short(seg, 40)));
+        }
+      }
+    }
+    if (ob !== cb) out.push(hit(text, { index: first }, '中括号未配对（' + ob + ' 个 [ 对 ' + cb + ' 个 ]）'));
+
     return out;
   }
 });

@@ -88,7 +88,7 @@ llmlint rules
 | --- | --- | --- |
 | `placeholder-text` | error | Leftover `TODO`, `FIXME`, `待补充`, `{{var}}` |
 | `empty-list-item` | error | Empty list items |
-| `unbalanced-markdown` | error | Unclosed `**` emphasis |
+| `unbalanced-markdown` | error | Unclosed `**`, `~~`, inline code, fences, link brackets |
 | `filler-words` | warning | More than 5 filler phrases |
 | `overclaim` | warning | Unfalsifiable claims |
 | `marketing-superlative` | warning | Marketing superlatives |

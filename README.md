@@ -90,7 +90,7 @@ llmlint rules
 | --- | --- | --- |
 | `placeholder-text` | error | 残留 `TODO`、`FIXME`、`待补充`、`{{var}}` |
 | `empty-list-item` | error | 空的列表项 `- ` |
-| `unbalanced-markdown` | error | 未闭合的 `**` |
+| `unbalanced-markdown` | error | 未闭合的 `**`、`~~`、内联代码、围栏、链接括号 |
 | `filler-words` | warning | 空洞词超过阈值（>5 处） |
 | `overclaim` | warning | `总是`、`100% 安全` 等不可证伪断言 |
 | `marketing-superlative` | warning | `革命性`、`神器`、`终极` 等营销词 |
